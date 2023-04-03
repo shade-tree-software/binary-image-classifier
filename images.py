@@ -93,6 +93,7 @@ plt.tight_layout()
 plt.show()
 
 # create the model
+# note: pytorch automatically initializes the weights of built-in layers in the nn module
 model = nn.Sequential()
 model.add_module('conv1', nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1))
 model.add_module('relu1', nn.ReLU())
@@ -145,12 +146,15 @@ def train(model, num_epochs, train_dl, valid_dl):
     accuracy_hist_valid[epoch] /= len(valid_dl.dataset)
 
     print(f'Epoch {epoch+1} accuracy: '
-          f'{accuracy_hist_train[epoch]:.4f} val_accuracy: '
+          f'{accuracy_hist_train[epoch]:.4f}, val_accuracy: '
           f'{accuracy_hist_valid[epoch]:.4f}')
   return loss_hist_train, loss_hist_valid, accuracy_hist_train, accuracy_hist_valid
 
 # train the model for specified number of epochs, then save the weights
 num_epochs = 30
+print(f'Training set size = {len(train_ds)}')
+print(f'Validation set size = {len(valid_ds)}')
+print(f'Training for {num_epochs} epochs with batch size = {batch_size}')
 hist = train(model, num_epochs, train_dl, valid_dl)
 torch.save(model.state_dict(), f'./model_state_dict_{int(time.time())}')
 
@@ -170,4 +174,16 @@ ax.legend(fontsize=15)
 ax.set_xlabel('Epoch', size=15)
 ax.set_ylabel('Accuracy', size=15)
 plt.show()
+
+#evaluate the model on the test set
+accuracy_test = 0
+model.eval()
+with torch.no_grad():
+  for x_batch, y_batch in test_dl:
+    pred = model(x_batch)[:,0]
+    is_correct = ((pred>=0.5).float() == y_batch).float()
+    accuracy_test += is_correct.sum()
+accuracy_test /= len(test_dl.dataset)
+print(f'Test set size = {len(test_ds)}')
+print(f'Test accuracy: {accuracy_test:.4f}')
 
