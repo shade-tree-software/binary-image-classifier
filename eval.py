@@ -9,7 +9,11 @@ if len(sys.argv) < 3:
     exit()
 
 model = nn.Sequential()
-model.add_module('conv1', nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1))
+model.add_module('conv0', nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1))
+model.add_module('relu0', nn.ReLU())
+model.add_module('pool0', nn.MaxPool2d(kernel_size=2))
+model.add_module('dropout0', nn.Dropout(p=0.5))
+model.add_module('conv1', nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1))
 model.add_module('relu1', nn.ReLU())
 model.add_module('pool1', nn.MaxPool2d(kernel_size=2))
 model.add_module('dropout1', nn.Dropout(p=0.5))
@@ -32,7 +36,7 @@ model.load_state_dict(torch.load(sys.argv[1]))
 img = Image.open(sys.argv[2])
 rgb_img = img.convert('RGB')
 
-img_size = 64
+img_size = 128
 eval_transform = transforms.Compose([
   transforms.Resize((img_size, img_size)),
   transforms.ToTensor(),

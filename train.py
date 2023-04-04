@@ -11,10 +11,18 @@ import pandas as pd
 import numpy as np
 import sys
 
+IMG_SIZE = 128
+CELEBA_MAX_IMAGES = 15000
+CELEBA_ATTR_FILE = 'list_attr_celeba.txt'
+CELEBA_ATTR_COL = 32
+CELEBA_IMAGE_DIR = 'img_align_celeba/'
+BATCH_SIZE = 32
+TEST_RATIO = 0.1
+NUM_EPOCHS = 30
+
 # set up transformations
-img_size = 64
 train_transform = transforms.Compose([
-  transforms.Resize((img_size, img_size)),
+  transforms.Resize((IMG_SIZE, IMG_SIZE)),
   transforms.RandomHorizontalFlip(),
   transforms.ToTensor(),
 ])
@@ -53,33 +61,37 @@ class ImageDataset(Dataset):
   def set_transform(self, transform):
     self.transform = transform
 
-if len(sys.argv) > 1 and sys.argv[1] == '-f':
+if len(sys.argv) == 4 and sys.argv[1] == '-f':
   # setup dataset based on two directories of image files, one directory for each class
-  imgdir0 = pathlib.Path('/mnt/andrew/photo/other/misc')
+  imgdir0 = pathlib.Path(sys.argv[2])
   files0 = [str(path) for path in imgdir0.glob('*.jpg')]
   labels0 = [0] * len(files0)
-  print(f'{len(files0)} files0: {files0[:3]}...')
-  imgdir1 = pathlib.Path('/mnt/andrew/photo/other/misc2')
+  print(f'Class 0, {len(files0)} files in {sys.argv[2]}')
+  imgdir1 = pathlib.Path(sys.argv[3])
   files1 = [str(path) for path in imgdir1.glob('*.jpg')]
   labels1 = [1] * len(files1)
-  print(f'{len(files1)} files1: {files1[:3]}...')
+  print(f'Class 1, {len(files1)} files in {sys.argv[3]}')
   full_ds = ImageDataset(files=files0 + files1,  labels=labels0 + labels1, transform=train_transform)
-else:
+elif len(sys.argv) == 2:
   # setup dataset based on CelebA data parsed into a dataframe
-  celeba_dir = '/home/awhamil/Dev/machine-learning-book/ch12/celeba/'
-  attrs = celeba_dir + 'list_attr_celeba.txt'
-  df = pd.read_csv(attrs, header=None, skiprows=[0,1], usecols=[0, 32], sep='\s+').iloc[:10000]
-  full_ds = ImageDataset(df=df, image_dir=celeba_dir + 'img_align_celeba/', transform=train_transform)
+  celeba_dir = sys.argv[1]
+  attrs = celeba_dir + CELEBA_ATTR_FILE
+  full_df = pd.read_csv(attrs, header=None, skiprows=[0,1], usecols=[0, CELEBA_ATTR_COL], sep='\s+')
+  df = full_df.iloc[:CELEBA_MAX_IMAGES]
+  full_ds = ImageDataset(df=df, image_dir=celeba_dir + CELEBA_IMAGE_DIR, transform=train_transform)
+else:
+  print(f'usage: {sys.argv[0]} <celeba dir>\n'
+        f'       {sys.argv[0]} -f <class 0 dir> <class 1 dir>')
+  exit(0)
 
 # split into training set, validation set, and test set
-valid_size = int(0.1 * len(full_ds))
-test_size = int(0.1 * len(full_ds))
+valid_size = int(TEST_RATIO * len(full_ds))
+test_size = int(TEST_RATIO * len(full_ds))
 train_size = len(full_ds) - valid_size - test_size
 train_ds, valid_ds, test_ds = torch.utils.data.random_split(full_ds, [train_size, valid_size, test_size])
-batch_size = 32
-train_dl = DataLoader(train_ds, batch_size, shuffle=True)
-valid_dl = DataLoader(valid_ds, batch_size, shuffle=False)
-test_dl = DataLoader(test_ds, batch_size, shuffle=False)
+train_dl = DataLoader(train_ds, BATCH_SIZE, shuffle=True)
+valid_dl = DataLoader(valid_ds, BATCH_SIZE, shuffle=False)
+test_dl = DataLoader(test_ds, BATCH_SIZE, shuffle=False)
 
 # display first 6 images in training set
 fig = plt.figure(figsize=(10,6))
@@ -97,7 +109,11 @@ plt.show()
 # create the model
 # note: pytorch automatically initializes the weights of built-in layers in the nn module
 model = nn.Sequential()
-model.add_module('conv1', nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1))
+model.add_module('conv0', nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1))
+model.add_module('relu0', nn.ReLU())
+model.add_module('pool0', nn.MaxPool2d(kernel_size=2))
+model.add_module('dropout0', nn.Dropout(p=0.5))
+model.add_module('conv1', nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1))
 model.add_module('relu1', nn.ReLU())
 model.add_module('pool1', nn.MaxPool2d(kernel_size=2))
 model.add_module('dropout1', nn.Dropout(p=0.5))
@@ -114,15 +130,16 @@ model.add_module('pool4', nn.AvgPool2d(kernel_size=8))
 model.add_module('flatten', nn.Flatten())
 model.add_module('fc', nn.Linear(256,1))
 model.add_module('sigmoid', nn.Sigmoid())
+print(model)
 
-def train(model, num_epochs, train_dl, valid_dl):
+def train(model, NUM_EPOCHS, train_dl, valid_dl):
   loss_fn = nn.BCELoss()
   optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-  loss_hist_train = [0] * num_epochs
-  accuracy_hist_train = [0] * num_epochs
-  loss_hist_valid = [0] * num_epochs
-  accuracy_hist_valid = [0] * num_epochs
-  for epoch in range(num_epochs):
+  loss_hist_train = [0] * NUM_EPOCHS
+  accuracy_hist_train = [0] * NUM_EPOCHS
+  loss_hist_valid = [0] * NUM_EPOCHS
+  accuracy_hist_valid = [0] * NUM_EPOCHS
+  for epoch in range(NUM_EPOCHS):
     model.train() # setup model for training
     for x_batch, y_batch in train_dl:
       pred = model(x_batch)[:, 0]
@@ -153,16 +170,15 @@ def train(model, num_epochs, train_dl, valid_dl):
   return loss_hist_train, loss_hist_valid, accuracy_hist_train, accuracy_hist_valid
 
 # train the model for specified number of epochs, then save the weights
-num_epochs = 30
 print(f'Training set size = {len(train_ds)}')
 print(f'Validation set size = {len(valid_ds)}')
-print(f'Training for {num_epochs} epochs with batch size = {batch_size}')
-hist = train(model, num_epochs, train_dl, valid_dl)
+print(f'Training for {NUM_EPOCHS} epochs with batch size = {BATCH_SIZE}')
+hist = train(model, NUM_EPOCHS, train_dl, valid_dl)
 torch.save(model.state_dict(), f'./model_state_dict_{int(time.time())}')
 
 # display charts of loss and accuracy 
 x_arr = np.arange(len(hist[0])) + 1
-fig = plt.figure(figsize=(12, 4))
+fig = plt.figure(figsize=(12, 5))
 ax = fig.add_subplot(1, 2, 1)
 ax.plot(x_arr, hist[0], '-o', label='Train loss')
 ax.plot(x_arr, hist[1], '--<', label='Validation loss')
