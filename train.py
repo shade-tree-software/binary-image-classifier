@@ -11,6 +11,8 @@ import pandas as pd
 import numpy as np
 import sys
 
+from basicCNN import model
+
 IMG_SIZE = 128
 CELEBA_MAX_IMAGES = 15000
 CELEBA_ATTR_FILE = 'list_attr_celeba.txt'
@@ -105,32 +107,6 @@ for i in range(6):
   ax.set_title(f'{label}', size=15)
 plt.tight_layout()
 plt.show()
-
-# create the model
-# note: pytorch automatically initializes the weights of built-in layers in the nn module
-model = nn.Sequential()
-model.add_module('conv0', nn.Conv2d(in_channels=3, out_channels=16, kernel_size=3, padding=1))
-model.add_module('relu0', nn.ReLU())
-model.add_module('pool0', nn.MaxPool2d(kernel_size=2))
-model.add_module('dropout0', nn.Dropout(p=0.5))
-model.add_module('conv1', nn.Conv2d(in_channels=16, out_channels=32, kernel_size=3, padding=1))
-model.add_module('relu1', nn.ReLU())
-model.add_module('pool1', nn.MaxPool2d(kernel_size=2))
-model.add_module('dropout1', nn.Dropout(p=0.5))
-model.add_module('conv2', nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1))
-model.add_module('relu2', nn.ReLU())
-model.add_module('pool2', nn.MaxPool2d(kernel_size=2))
-model.add_module('dropout2', nn.Dropout(p=0.5))
-model.add_module('conv3', nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1))
-model.add_module('relu3', nn.ReLU())
-model.add_module('pool3', nn.MaxPool2d(kernel_size=2))
-model.add_module('conv4', nn.Conv2d(in_channels=128, out_channels=256, kernel_size=3, padding=1))
-model.add_module('relu4', nn.ReLU())
-model.add_module('pool4', nn.AvgPool2d(kernel_size=8))
-model.add_module('flatten', nn.Flatten())
-model.add_module('fc', nn.Linear(256,1))
-model.add_module('sigmoid', nn.Sigmoid())
-print(model)
 
 def train(model, NUM_EPOCHS, train_dl, valid_dl):
   loss_fn = nn.BCELoss()

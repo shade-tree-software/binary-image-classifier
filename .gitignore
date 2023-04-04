@@ -1,2 +1,3 @@
 model_state_dict*
 *.jpg
+__pycache__/
