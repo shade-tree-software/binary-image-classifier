@@ -1,3 +1,4 @@
+import pathlib
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 import time
 import pandas as pd
 import numpy as np
+import sys
 
 # set up transformations
 img_size = 64
@@ -30,9 +32,9 @@ class ImageDataset(Dataset):
     self.transform = transform
 
   def __getitem__(self, index):
-    if df is not None:
-      file = self.image_dir + df.iloc[index, 0]
-      label = 1 if df.iloc[index, 1] == 1 else 0
+    if self.df is not None:
+      file = self.image_dir + self.df.iloc[index, 0]
+      label = 1 if self.df.iloc[index, 1] == 1 else 0
     else:
       file = self.image_dir + self.files[index]
       label = self.labels[index]
@@ -43,7 +45,7 @@ class ImageDataset(Dataset):
     return rgb_img, label
 
   def __len__(self):
-    if df is not None:
+    if self.df is not None:
       return len(df.index)
     else:
       return len(self.labels)
@@ -51,22 +53,23 @@ class ImageDataset(Dataset):
   def set_transform(self, transform):
     self.transform = transform
 
-# setup dataset based on two directories of image files, one directory for each class
-#imgdir0 = pathlib.Path('/mnt/andrew/photo/other/misc')
-#files0 = [str(path) for path in imgdir0.glob('*.jpg')]
-#labels0 = [0] * len(files0)
-#print(f'{len(files0)} files0: {files0[:3]}...')
-#imgdir1 = pathlib.Path('/mnt/andrew/photo/other/misc2')
-#files1 = [str(path) for path in imgdir1.glob('*.jpg')]
-#labels1 = [1] * len(files1)
-#print(f'{len(files1)} files1: {files1[:3]}...')
-#full_ds = ImageDataset(files=files0 + files1,  labels=labels0 + labels1, transform=train_transform)
-
-# setup dataset based on CelebA data parsed into a dataframe
-celeba_dir = '/home/awhamil/Dev/machine-learning-book/ch12/celeba/'
-attrs = celeba_dir + 'list_attr_celeba.txt'
-df = pd.read_csv(attrs, header=None, skiprows=[0,1], usecols=[0, 32], sep='\s+').iloc[:10000]
-full_ds = ImageDataset(df=df, image_dir=celeba_dir + 'img_align_celeba/', transform=train_transform)
+if len(sys.argv) > 1 and sys.argv[1] == '-f':
+  # setup dataset based on two directories of image files, one directory for each class
+  imgdir0 = pathlib.Path('/mnt/andrew/photo/other/misc')
+  files0 = [str(path) for path in imgdir0.glob('*.jpg')]
+  labels0 = [0] * len(files0)
+  print(f'{len(files0)} files0: {files0[:3]}...')
+  imgdir1 = pathlib.Path('/mnt/andrew/photo/other/misc2')
+  files1 = [str(path) for path in imgdir1.glob('*.jpg')]
+  labels1 = [1] * len(files1)
+  print(f'{len(files1)} files1: {files1[:3]}...')
+  full_ds = ImageDataset(files=files0 + files1,  labels=labels0 + labels1, transform=train_transform)
+else:
+  # setup dataset based on CelebA data parsed into a dataframe
+  celeba_dir = '/home/awhamil/Dev/machine-learning-book/ch12/celeba/'
+  attrs = celeba_dir + 'list_attr_celeba.txt'
+  df = pd.read_csv(attrs, header=None, skiprows=[0,1], usecols=[0, 32], sep='\s+').iloc[:10000]
+  full_ds = ImageDataset(df=df, image_dir=celeba_dir + 'img_align_celeba/', transform=train_transform)
 
 # split into training set, validation set, and test set
 valid_size = int(0.1 * len(full_ds))
